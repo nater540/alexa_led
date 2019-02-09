@@ -1,13 +1,26 @@
 // `error_chain!` can recurse deeply
 #![recursion_limit = "1024"]
 
+#[macro_use]
+extern crate diesel;
+
+#[macro_use]
+extern crate diesel_migrations;
+
+#[macro_use]
+extern crate serde_derive;
+
+embed_migrations!("migrations");
+
 use clap::{App, Arg};
+use dotenv::dotenv;
 
 pub mod errors {
   use error_chain::*;
 
   error_chain! {
     foreign_links {
+      Config(::config::ConfigError);
       Log(::log::SetLoggerError);
       Io(::std::io::Error);
     }
@@ -16,9 +29,12 @@ pub mod errors {
 
 use errors::*;
 
+pub mod settings;
 pub mod server;
-
 pub mod alexa;
+pub mod db;
+
+use settings::Settings;
 
 fn setup_logger() -> Result<()> {
   fern::Dispatch::new()
@@ -61,6 +77,8 @@ fn main() {
 }
 
 fn run() -> Result<()> {
+  dotenv().ok();
+
   let arguments = App::new("Ragnarok")
     .about("LED Strip Manager")
     .version("1.0")
@@ -75,15 +93,15 @@ fn run() -> Result<()> {
 
   // Figure out what config file to load
   let cwd = ::std::env::current_dir()?;
-  let default_config = format!("{}/default.yaml", cwd.display());
-  let _config_file = arguments.value_of("config").unwrap_or(&default_config);
+  let default_config = format!("{}/config.yaml", cwd.display());
+  let config_file = arguments.value_of("config").unwrap_or(&default_config);
+
+  let settings = Settings::new(config_file)?;
 
   setup_logger()?;
 
   let sys = actix::System::new("ragnarok");
-
-  server::start("127.0.0.1:8080")?;
-
+  server::start(&settings)?;
   let _ = sys.run();
 
   Ok(())

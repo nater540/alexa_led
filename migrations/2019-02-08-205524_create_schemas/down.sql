@@ -1,0 +1,3 @@
+DROP SCHEMA IF EXISTS app_public;
+DROP SCHEMA IF EXISTS app_hidden;
+DROP SCHEMA IF EXISTS app_private;

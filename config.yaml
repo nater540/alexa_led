@@ -1,0 +1,7 @@
+inbound_listener:
+  address: "127.0.0.1:9000"
+  backlog: 9000
+  workers: 6
+
+database:
+  address: "127.0.0.1:5432"

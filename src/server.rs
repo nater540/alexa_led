@@ -1,23 +1,28 @@
 use std::sync::Arc;
 
 use actix_web::{http, server::HttpServer, App, State};
+use actix::prelude::*;
 
-use super::errors::*;
+use crate::errors::*;
+use crate::Settings;
 
 mod routes;
 use routes::authenticate;
 
-#[derive(Debug)]
 pub struct AppState {
-  pub settings: String
+  pub db: Addr<crate::db::Database>,
+  //pub settings: Settings
 }
 
 pub type RagnarokState = State<Arc<AppState>>;
 
-pub fn start(address: &str) -> Result<()> {
+pub fn start(settings: &Settings) -> Result<()> {
+  let pool = crate::db::pool();
+  let addr = SyncArbiter::start(12, move || crate::db::Database(pool.clone()));
+
   let state = Arc::new(AppState {
-    // settings: Settings::new("config/*.{yml|yaml}").unwrap()
-    settings: "Kitty!".to_string()
+    db: addr.clone(),
+    //settings: settings.clone()
   });
 
   let ragnarok_app = move || {
@@ -28,7 +33,12 @@ pub fn start(address: &str) -> Result<()> {
       })
   };
 
-  HttpServer::new(ragnarok_app).bind(address).unwrap().start();
+  HttpServer::new(ragnarok_app)
+    .backlog(9000)
+    .workers(4)
+    .bind(settings.inbound_listener.address)
+    .unwrap()
+    .start();
 
   Ok(())
 }
